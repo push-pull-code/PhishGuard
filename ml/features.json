@@ -1,0 +1,18 @@
+{
+  "_FILE": "features.json",
+  "_PURPOSE": "Ordered list of feature columns \u2014 MUST match model.pkl",
+  "_CONNECTS_TO": "ml/feature_extractor.py, ml/train.py",
+  "features": [
+    "url_length",
+    "num_dots",
+    "num_hyphens",
+    "num_at_symbols",
+    "num_special_chars",
+    "subdomain_depth",
+    "has_ip_address",
+    "has_https",
+    "shannon_entropy",
+    "domain_length",
+    "is_common_tld"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "_FILE": "manifest.json",
+  "_PURPOSE": "Chrome extension configuration — declares permissions, popup, and background worker",
+  "_CONNECTS_TO": "extension/popup.html, extension/popup.js, extension/background.js",
+
+  "_HOW_TO_LOAD_IN_CHROME": [
+    "1. Open chrome://extensions in your browser",
+    "2. Enable 'Developer mode' toggle (top-right corner)",
+    "3. Click 'Load unpacked' button",
+    "4. Select the /extension folder from the file picker",
+    "5. The PhishGuard icon will appear in your toolbar"
+  ],
+
+  "manifest_version": 3,
+  "name": "PhishGuard",
+  "description": "Real-time phishing URL detection powered by ML + threat intelligence",
+  "version": "1.0.0",
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PhishGuard — Scan this page"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+
+  "_PERMISSION_EXPLANATIONS": {
+    "activeTab": "Grants TEMPORARY access to the currently active tab ONLY when the user clicks the extension icon. This is the least-privileged way to read the current URL. Without it we'd need the much broader 'tabs' permission which exposes ALL tabs at all times.",
+    "storage": "Allows the extension to read/write to chrome.storage.local (a persistent key-value store scoped to this extension). We use it to cache scan results per domain so we don't re-scan the same site on every popup open. Unlike localStorage, chrome.storage works in service workers and syncs across extension contexts.",
+    "scripting": "Allows the extension to programmatically inject scripts or CSS into web pages via chrome.scripting.executeScript(). We may use this in future to highlight phishing indicators directly on the page (e.g. red border around a fake login form)."
+  }
+}

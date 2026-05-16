@@ -1,0 +1,52 @@
+/* FILE: index.css */
+/* PURPOSE: Global styles — imports Tailwind CSS v4, custom theme tokens, and base typography */
+/* CONNECTS TO: dashboard/src/main.jsx */
+
+@import "tailwindcss";
+
+/* =====================================================================
+   CUSTOM THEME
+   ===================================================================== */
+
+@theme {
+  --color-surface:    #0f172a;
+  --color-surface-2:  #1e293b;
+  --color-surface-3:  #334155;
+  --color-border:     #334155;
+  --color-text:       #f8fafc;
+  --color-text-muted: #94a3b8;
+  --color-accent:     #6366f1;
+  --color-accent-hover: #818cf8;
+
+  --color-safe:       #22c55e;
+  --color-suspicious: #f59e0b;
+  --color-malicious:  #ef4444;
+}
+
+:root {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Smooth transitions on interactive elements */
+button, input {
+  transition: all 0.15s ease;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface); }
+::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 3px; }
+
+/* Pulse animation for loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 0.8s linear infinite; }

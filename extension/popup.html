@@ -1,0 +1,159 @@
+<!-- FILE: popup.html -->
+<!-- PURPOSE: Extension popup UI — shows scanned URL, threat level badge, confidence %, and forensics summary -->
+<!-- CONNECTS TO: extension/popup.js, extension/manifest.json -->
+<!-- FLOW: User clicks extension icon → Chrome opens this popup → popup.js runs on DOMContentLoaded -->
+
+<!--
+  HOW TO LOAD IN CHROME:
+  1. Open chrome://extensions
+  2. Enable Developer Mode (top-right toggle)
+  3. Click "Load unpacked" → select the /extension folder
+  4. Click the PhishGuard icon in the toolbar to open this popup
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishGuard</title>
+
+  <!-- Tailwind CSS via CDN for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Configure Tailwind's dark mode and extend the color palette
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts: Inter for clean typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* Chrome extension popups have a fixed width; we set it here */
+    body {
+      width: 380px;
+      min-height: 200px;
+    }
+
+    /* Pulse animation for the scanning state */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .animate-pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+    /* Smooth entrance animation */
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up { animation: slide-up 0.3s ease-out; }
+  </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 font-sans p-4">
+
+  <!-- ============================== -->
+  <!-- HEADER                         -->
+  <!-- ============================== -->
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-2xl">🛡️</span>
+    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+      PhishGuard
+    </h1>
+  </div>
+
+  <!-- ============================== -->
+  <!-- CURRENT URL DISPLAY            -->
+  <!-- ============================== -->
+  <div id="url-bar" class="bg-slate-800/70 rounded-xl px-3 py-2 mb-4 border border-slate-700/50">
+    <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Scanning</p>
+    <p id="current-url" class="text-xs text-slate-300 break-all leading-relaxed truncate">
+      Loading…
+    </p>
+  </div>
+
+  <!-- ============================== -->
+  <!-- LOADING STATE                  -->
+  <!-- ============================== -->
+  <div id="loading-state" class="flex flex-col items-center justify-center py-8">
+    <div class="flex gap-1.5 mb-3">
+      <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-dot" style="animation-delay: 0s;"></span>
+      <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-dot" style="animation-delay: 0.2s;"></span>
+      <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-dot" style="animation-delay: 0.4s;"></span>
+    </div>
+    <p class="text-xs text-slate-500">Analysing URL…</p>
+  </div>
+
+  <!-- ============================== -->
+  <!-- RESULT CARD (hidden by default)-->
+  <!-- ============================== -->
+  <div id="result-card" class="hidden animate-slide-up">
+
+    <!-- Threat level badge -->
+    <div id="threat-badge" class="rounded-xl p-4 mb-3 border">
+      <div class="flex items-center justify-between mb-2">
+        <span id="threat-icon" class="text-3xl"></span>
+        <div class="text-right">
+          <p id="threat-label" class="text-sm font-bold uppercase tracking-wider"></p>
+          <p id="threat-score" class="text-2xl font-bold"></p>
+        </div>
+      </div>
+      <p id="confidence-text" class="text-xs opacity-75"></p>
+    </div>
+
+    <!-- Reasons list -->
+    <div id="reasons-box" class="bg-slate-800/50 rounded-xl p-3 mb-3 border border-slate-700/30">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Findings</p>
+      <ul id="reasons-list" class="space-y-1 text-xs text-slate-300"></ul>
+    </div>
+
+    <!-- Forensics summary -->
+    <div id="forensics-box" class="bg-slate-800/50 rounded-xl p-3 mb-3 border border-slate-700/30">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Domain Forensics</p>
+      <div id="forensics-grid" class="grid grid-cols-2 gap-2 text-xs"></div>
+    </div>
+
+    <!-- Response time -->
+    <p id="response-time" class="text-[10px] text-slate-600 text-center"></p>
+  </div>
+
+  <!-- ============================== -->
+  <!-- ERROR STATE (hidden by default)-->
+  <!-- ============================== -->
+  <div id="error-state" class="hidden animate-slide-up">
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+      <p class="text-3xl mb-2">⚠️</p>
+      <p id="error-title" class="text-sm font-semibold text-red-400 mb-1">Backend not running</p>
+      <p id="error-detail" class="text-xs text-slate-400">
+        Start the API server with:<br />
+        <code class="bg-slate-800 px-2 py-0.5 rounded text-[11px] mt-1 inline-block">
+          python backend/main.py
+        </code>
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================== -->
+  <!-- RESCAN BUTTON                  -->
+  <!-- ============================== -->
+  <button
+    id="rescan-btn"
+    class="hidden w-full mt-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition cursor-pointer"
+  >
+    🔄 Rescan
+  </button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
