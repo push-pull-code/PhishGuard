@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "PhishGuard",
+  "description": "Real-time phishing URL detection powered by ML + threat intelligence",
+  "version": "2.0.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PhishGuard — Scanning…"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs",
+    "alarms",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ]
+}
