@@ -59,7 +59,13 @@ async def scan_url(req: ScanRequest, request: Request):
 
     async def run_sync(func, *args):
         return await loop.run_in_executor(None, func, *args)
-    threat_intel_result, whois_result, dns_result, typo_result = await asyncio.gather(run_threat_intel(cleaned_url), run_sync(get_whois_info, bare_domain), run_sync(get_dns_records, bare_domain), run_sync(detect_typosquatting, bare_domain), return_exceptions=True)
+    threat_intel_result, whois_result, dns_result, typo_result = await asyncio.gather(
+        asyncio.wait_for(run_threat_intel(cleaned_url), timeout=2.0),
+        asyncio.wait_for(run_sync(get_whois_info, bare_domain), timeout=2.0),
+        asyncio.wait_for(run_sync(get_dns_records, bare_domain), timeout=1.0),
+        run_sync(detect_typosquatting, bare_domain),
+        return_exceptions=True
+    )
     if isinstance(threat_intel_result, Exception):
         threat_intel_result = {'virustotal': {}, 'urlhaus': {}, 'error': str(threat_intel_result)}
     if isinstance(whois_result, Exception):
@@ -68,9 +74,6 @@ async def scan_url(req: ScanRequest, request: Request):
         dns_result = {'error': str(dns_result)}
     if isinstance(typo_result, Exception):
         typo_result = {'error': str(typo_result)}
-    if typo_result.get('edit_distance') == 0:
-        ml_confidence = 0.0
-        is_phishing = False
     forensics_data = {'whois': whois_result, 'dns': dns_result, 'typosquatting': typo_result}
     threat_score_data = combine_final_score(ml_confidence, threat_intel_result, forensics_data)
     if whois_result.get('is_newly_registered'):

@@ -4,8 +4,8 @@ PhishGuard is a phishing detection system leveraging Machine Learning and extern
 
 ### Components
 1. **Machine Learning Pipeline**: XGBoost model trained on phishing and legitimate URLs.
-2. **FastAPI Backend**: Serves the model and runs parallel forensics.
-3. **React Dashboard**: Web interface for analysts to review scans and IoCs.
+2. **FastAPI Backend**: Serves the model, runs parallel forensics, and hosts the dashboard.
+3. **Web Dashboard**: Glassmorphism UI served directly from FastAPI (no Node.js required).
 4. **Chrome Extension**: Real-time browser scanning.
 
 ---
@@ -44,14 +44,7 @@ This generates `model.pkl` and `features.json` in the `ml/` directory.
 python backend/main.py
 ```
 The FastAPI server will start on `http://0.0.0.0:8000`.
-
-## 5. Run the Dashboard
-
-```bash
-cd dashboard
-npm install
-npm run dev
-```
+The dashboard is available at `http://localhost:8000`.
 
 ## 6. Chrome Extension
 

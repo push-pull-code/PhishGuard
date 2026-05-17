@@ -40,7 +40,7 @@ export default function RiskChart({ history = [] }) {
         Risk Distribution
       </h2>
 
-      <div className="bg-[var(--color-surface-2)]/40 border border-[var(--color-border)] rounded-xl p-4">
+      <div className="glass-panel/40 border border-[var(--color-border)] rounded-xl p-4">
         
         <ResponsiveContainer width="100%" height={220}>
           

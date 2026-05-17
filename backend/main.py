@@ -6,15 +6,22 @@ import logging
 import joblib
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 from routes import scan, health
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)-7s | %(message)s')
 logger = logging.getLogger('phishguard')
+
 app = FastAPI(title='PhishGuard API', description='Real-time phishing URL detection API powered by XGBoost', version='1.0.0')
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+
+app.mount('/static', StaticFiles(directory=os.path.join(_BACKEND_DIR, 'static')), name='static')
 
 @app.middleware('http')
 async def response_time_middleware(request: Request, call_next):
@@ -44,8 +51,16 @@ async def load_model():
         app.state.feature_order = []
         logger.warning('features.json not found at %s — feature alignment disabled.', features_path)
     app.state.scan_history = []
+
 app.include_router(health.router)
 app.include_router(scan.router)
+
+@app.get('/', response_class=HTMLResponse)
+async def serve_dashboard():
+    template_path = os.path.join(_BACKEND_DIR, 'templates', 'index.html')
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run('main:app', host='0.0.0.0', port=8000, reload=True)

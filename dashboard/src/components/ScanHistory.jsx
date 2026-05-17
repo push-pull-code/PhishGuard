@@ -24,7 +24,7 @@ export default function ScanHistory({ history = [] }) {
       <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[var(--color-surface-2)] text-[var(--color-text-muted)] uppercase tracking-wider text-[10px]">
+            <tr className="glass-panel text-[var(--color-text-muted)] uppercase tracking-wider text-[10px]">
               <th className="text-left px-4 py-2.5 font-medium">URL</th>
               <th className="text-center px-3 py-2.5 font-medium">Threat Level</th>
               <th className="text-center px-3 py-2.5 font-medium">Score</th>
@@ -46,7 +46,7 @@ export default function ScanHistory({ history = [] }) {
               return (
                 <tr
                   key={idx}
-                  className="border-t border-[var(--color-border)]/50 hover:bg-[var(--color-surface-2)]/40 transition-colors"
+                  className="border-t border-[var(--color-border)]/50 hover:glass-panel/40 transition-colors"
                 >
                   <td className="px-4 py-2.5 text-slate-300 font-mono" title={scan.url}>
                     {displayUrl}

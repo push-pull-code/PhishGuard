@@ -49,7 +49,7 @@ export default function IoCReport({ history = [] }) {
         id="export-ioc-btn"
         onClick={handleExport}
         className="flex items-center gap-2 px-5 py-2.5 rounded-xl
-                   bg-[var(--color-surface-2)] border border-[var(--color-border)]
+                   glass-panel border border-[var(--color-border)]
                    hover:border-[var(--color-accent)] hover:bg-[var(--color-accent)]/10
                    text-sm font-medium text-[var(--color-text)] transition cursor-pointer"
       >

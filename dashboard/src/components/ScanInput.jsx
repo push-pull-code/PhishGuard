@@ -60,7 +60,7 @@ export default function ScanInput({ onResult, onLoading }) {
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="https://example.com"
-          className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)]/60
+          className="flex-1 rounded-xl border border-[var(--color-border)] glass-panel
                      px-4 py-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]
                      outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition"
         />

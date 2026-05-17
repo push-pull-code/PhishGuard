@@ -51,7 +51,7 @@ export default function ResultCard({ result }) {
           <span className="text-[var(--color-text-muted)]">ML Confidence</span>
           <span className={`font-mono font-semibold ${p.text}`}>{(confidence * 100).toFixed(1)}%</span>
         </div>
-        <div className="w-full h-2 rounded-full bg-[var(--color-surface-3)]">
+        <div className="w-full h-2 rounded-full glass-panel">
           <div
             className={`h-full rounded-full ${p.bar} transition-all duration-500`}
             style={{ width: `${Math.min(confidence * 100, 100)}%` }}
@@ -143,7 +143,7 @@ export default function ResultCard({ result }) {
 
 function InfoTile({ label, value, warn = false }) {
   return (
-    <div className={`bg-[var(--color-surface-2)]/60 rounded-lg px-3 py-2
+    <div className={`glass-panel rounded-lg px-3 py-2
                      ${warn ? "border border-amber-500/25" : "border border-transparent"}`}>
       <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{label}</p>
       <p className={`text-xs font-medium mt-0.5 ${warn ? "text-amber-400" : "text-slate-300"}`}>{value}</p>

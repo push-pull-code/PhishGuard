@@ -33,7 +33,7 @@ export default function App() {
 
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold tracking-tight mb-2
-                        bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
           🛡️ PhishGuard
         </h1>
         <p className="text-[var(--color-text-muted)] text-sm max-w-md">

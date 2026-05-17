@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhishGuard — Real-time phishing URL detection powered by ML, threat intelligence, and domain forensics.">
+  <title>PhishGuard — Phishing URL Scanner</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+
+  <div class="container">
+
+    <header>
+      <h1>🛡️ PhishGuard</h1>
+      <p>Real-time phishing URL detection — powered by ML, threat intelligence, and domain forensics.</p>
+    </header>
+
+    <div class="scan-bar">
+      <input id="url-input" type="text" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+      <button id="scan-btn" class="btn-scan">
+        <span id="scan-spinner" class="spinner hidden"></span>
+        <span id="scan-label">🔍 Scan URL</span>
+      </button>
+    </div>
+
+    <div id="error-msg" class="error-msg hidden"></div>
+
+    <div id="result-wrap" style="transition:opacity 0.3s">
+
+      <div id="result-card" class="result-card glass-strong hidden"></div>
+
+      <div id="chart-section" class="section hidden">
+        <h2>Risk Distribution</h2>
+        <div class="glass chart-container">
+          <canvas id="risk-chart" height="200"></canvas>
+        </div>
+      </div>
+
+      <div id="history-section" class="section hidden">
+        <h2>Scan History (<span id="history-count">0</span>)</h2>
+        <div class="glass" style="overflow:hidden">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>URL</th>
+                <th>Threat Level</th>
+                <th>Score</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="export-section" class="section hidden" style="text-align:center">
+        <button id="export-btn" class="btn-export">📄 Export IoC Report</button>
+      </div>
+
+    </div>
+
+    <div id="empty-state" class="empty-state">
+      <p>No scans yet — enter a URL above to get started.</p>
+    </div>
+
+    <footer>
+      PhishGuard v1.0.0 — ML + Threat Intel + Domain Forensics
+    </footer>
+
+  </div>
+
+</body>
+</html>

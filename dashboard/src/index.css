@@ -9,18 +9,18 @@
    ===================================================================== */
 
 @theme {
-  --color-surface:    #0f172a;
-  --color-surface-2:  #1e293b;
-  --color-surface-3:  #334155;
-  --color-border:     #334155;
-  --color-text:       #f8fafc;
-  --color-text-muted: #94a3b8;
-  --color-accent:     #6366f1;
-  --color-accent-hover: #818cf8;
+  --color-surface:    rgba(10, 10, 15, 0.4);
+  --color-surface-2:  rgba(255, 255, 255, 0.05);
+  --color-surface-3:  rgba(255, 255, 255, 0.1);
+  --color-border:     rgba(255, 255, 255, 0.15);
+  --color-text:       #ffffff;
+  --color-text-muted: rgba(255, 255, 255, 0.65);
+  --color-accent:     #ec4899;
+  --color-accent-hover: #f472b6;
 
-  --color-safe:       #22c55e;
-  --color-suspicious: #f59e0b;
-  --color-malicious:  #ef4444;
+  --color-safe:       #4ade80;
+  --color-suspicious: #fbbf24;
+  --color-malicious:  #f87171;
 }
 
 :root {
@@ -31,21 +31,39 @@
 
 body {
   margin: 0;
-  background: var(--color-surface);
+  background-color: #05050a;
+  background-image: url('/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   color: var(--color-text);
+  min-height: 100vh;
 }
 
-/* Smooth transitions on interactive elements */
+.glass {
+  background: var(--color-surface-2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.glass-panel {
+  background: var(--color-surface-3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border);
+}
+
 button, input {
-  transition: all 0.15s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Custom scrollbar for dark theme */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-surface); }
-::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 3px; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-/* Pulse animation for loading spinner */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
