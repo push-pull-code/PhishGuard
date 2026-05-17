@@ -19,6 +19,29 @@ def load_iscx(path: str) -> pd.DataFrame:
     df['label'] = (df['type'] == 'phishing').astype(int)
     return df[['url', 'label']]
 
+def load_phishtank(path: str) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(path)
+        if 'url' in df.columns:
+            df = df[['url']].copy()
+        else:
+            df = pd.DataFrame({'url': df.iloc[:, 1]})
+        df['label'] = 1
+        return df[['url', 'label']]
+    except Exception as e:
+        print(f'[!] Failed to load PhishTank: {e}')
+        return pd.DataFrame(columns=['url', 'label'])
+
+def load_urlhaus(path: str) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(path, comment='#', header=None, names=['id','dateadded','url','url_status','last_online','threat','tags','urlhaus_link','reporter'], quotechar='"')
+        df = df[['url']].dropna().copy()
+        df['label'] = 1
+        return df[['url', 'label']]
+    except Exception as e:
+        print(f'[!] Failed to load URLHaus: {e}')
+        return pd.DataFrame(columns=['url', 'label'])
+
 def load_tranco(path: str, prefix: str='https://') -> pd.DataFrame:
     import random
     random.seed(42)
@@ -40,11 +63,28 @@ def load_and_combine(data_dir: str) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     iscx_path = os.path.join(data_dir, 'iscx_url_2016.csv')
     tranco_path = os.path.join(data_dir, 'tranco_top1m.csv')
+    phishtank_path = os.path.join(data_dir, 'phishtank.csv')
+    urlhaus_path = os.path.join(data_dir, 'urlhaus.csv')
     if os.path.isfile(iscx_path):
         print(f'[+] Loading ISCX-URL-2016 from {iscx_path}')
         frames.append(load_iscx(iscx_path))
     else:
         print(f'[!] ISCX-URL-2016 not found at {iscx_path} — skipping')
+    
+    if os.path.isfile(phishtank_path):
+        print(f'[+] Loading PhishTank from {phishtank_path}')
+        pt_df = load_phishtank(phishtank_path)
+        if not pt_df.empty: frames.append(pt_df)
+    else:
+        print(f'[!] PhishTank not found at {phishtank_path} — skipping')
+        
+    if os.path.isfile(urlhaus_path):
+        print(f'[+] Loading URLHaus from {urlhaus_path}')
+        uh_df = load_urlhaus(urlhaus_path)
+        if not uh_df.empty: frames.append(uh_df)
+    else:
+        print(f'[!] URLHaus not found at {urlhaus_path} — skipping')
+
     if os.path.isfile(tranco_path):
         print(f'[+] Loading Tranco Top-1M from {tranco_path}')
         frames.append(load_tranco(tranco_path))
