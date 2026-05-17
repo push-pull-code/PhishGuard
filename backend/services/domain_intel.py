@@ -68,11 +68,23 @@ def get_dns_records(domain: str) -> dict:
 def detect_typosquatting(domain: str) -> dict:
     if not _TOP_DOMAINS:
         return {'is_typosquat': False, 'closest_match': None, 'edit_distance': None, 'original_brand': None, 'note': 'Tranco list not loaded — typosquatting check skipped'}
-    domain_base = domain.split('.')[0].lower()
+    parts = domain.split('.')
+    if len(parts) >= 3 and parts[-2] in ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac']:
+        # e.g. bbc.co.uk -> bbc
+        domain_base = parts[-3].lower()
+    else:
+        # e.g. en.wikipedia.org -> wikipedia
+        domain_base = parts[-2].lower() if len(parts) >= 2 else parts[0].lower()
+    
     best_match: Optional[str] = None
     best_distance: int = 999
     for legit_domain in _TOP_DOMAINS:
-        legit_base = legit_domain.split('.')[0].lower()
+        legit_parts = legit_domain.split('.')
+        if len(legit_parts) >= 3 and legit_parts[-2] in ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac']:
+            legit_base = legit_parts[-3].lower()
+        else:
+            legit_base = legit_parts[-2].lower() if len(legit_parts) >= 2 else legit_parts[0].lower()
+            
         if domain_base == legit_base:
             return {'is_typosquat': False, 'closest_match': legit_domain, 'edit_distance': 0, 'original_brand': None}
         dist = Levenshtein.distance(domain_base, legit_base)
