@@ -4,3 +4,4 @@ __pycache__/
 *.pkl
 ml/data/*.csv
 .env
+venv/

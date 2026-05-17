@@ -1,6 +1,3 @@
-// FILE: main.jsx
-// PURPOSE: React application entry point — mounts App into the DOM
-// CONNECTS TO: dashboard/src/App.jsx, dashboard/src/index.css
 
 import React from "react";
 import ReactDOM from "react-dom/client";

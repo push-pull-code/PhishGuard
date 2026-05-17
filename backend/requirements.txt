@@ -1,6 +1,4 @@
-# FILE: requirements.txt
-# PURPOSE: Lists all Python dependencies for the PhishGuard backend and ML pipeline
-# CONNECTS TO: Used by pip to install dependencies for backend/ and ml/
+
 fastapi
 uvicorn
 scikit-learn

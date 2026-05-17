@@ -1,26 +1,4 @@
-// FILE: ResultCard.jsx
-// PURPOSE: Displays the full scan verdict — threat badge, ML confidence, forensics, obfuscation, VT, typosquat
-// CONNECTS TO: App.jsx
-//
-// FLOW: App passes scan result as props → ResultCard renders all fields
 
-// =====================================================================
-// WHY EACH FIELD IS SHOWN TO AN ANALYST
-// =====================================================================
-// Security analysts need more than a binary "safe/phishing" answer.
-// Each field gives them a different LAYER of evidence:
-//
-//   • Threat badge + score       → at-a-glance severity (triage priority)
-//   • ML confidence bar          → how certain the ML model is (low confidence
-//                                  means the analyst should investigate manually)
-//   • Obfuscation techniques     → shows if the attacker tried to hide the URL;
-//                                  even a "safe" URL with heavy obfuscation is suspicious
-//   • VirusTotal engine count    → independent validation from 70+ engines;
-//                                  high count = high-confidence known threat
-//   • WHOIS domain age           → newly-registered domains are the #1 phishing indicator;
-//                                  legitimate brands own their domains for years
-//   • Typosquatting warning      → tells the analyst which brand is being impersonated,
-//                                  which is critical for incident response and takedown
 
 export default function ResultCard({ result }) {
   if (!result) return null;
@@ -41,7 +19,6 @@ export default function ResultCard({ result }) {
   const score = threat_score.score ?? 0;
   const reasons = threat_score.reasons || [];
 
-  // --- Color scheme per threat level ---
   const palette = {
     safe:       { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", bar: "bg-emerald-500", icon: "✅" },
     suspicious: { bg: "bg-amber-500/10",   border: "border-amber-500/30",   text: "text-amber-400",   bar: "bg-amber-500",   icon: "⚠️" },
@@ -58,9 +35,6 @@ export default function ResultCard({ result }) {
   return (
     <div className={`w-full max-w-2xl mx-auto rounded-2xl border ${p.border} ${p.bg} p-6 mb-6 backdrop-blur-sm`}>
 
-      {/* ============================================ */}
-      {/* THREAT BADGE + SCORE                         */}
-      {/* ============================================ */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <span className="text-4xl">{p.icon}</span>
@@ -72,9 +46,6 @@ export default function ResultCard({ result }) {
         <p className="text-xs text-[var(--color-text-muted)]">{response_time_ms?.toFixed(0)} ms</p>
       </div>
 
-      {/* ============================================ */}
-      {/* ML CONFIDENCE BAR                            */}
-      {/* ============================================ */}
       <div className="mb-5">
         <div className="flex justify-between text-xs mb-1">
           <span className="text-[var(--color-text-muted)]">ML Confidence</span>
@@ -88,9 +59,6 @@ export default function ResultCard({ result }) {
         </div>
       </div>
 
-      {/* ============================================ */}
-      {/* REASONS                                      */}
-      {/* ============================================ */}
       {reasons.length > 0 && (
         <div className="mb-5">
           <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-2">Findings</p>
@@ -105,12 +73,8 @@ export default function ResultCard({ result }) {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* INFO GRID (VT, URLhaus, WHOIS, DNS, Typo)   */}
-      {/* ============================================ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
 
-        {/* VirusTotal engine count */}
         {vt.available && (
           <InfoTile
             label="VirusTotal"
@@ -119,7 +83,6 @@ export default function ResultCard({ result }) {
           />
         )}
 
-        {/* URLhaus */}
         {uh.available && (
           <InfoTile
             label="URLhaus"
@@ -128,7 +91,6 @@ export default function ResultCard({ result }) {
           />
         )}
 
-        {/* WHOIS domain age */}
         {whois.available && (
           <InfoTile
             label="Domain Age"
@@ -137,7 +99,6 @@ export default function ResultCard({ result }) {
           />
         )}
 
-        {/* DNS records */}
         {dns.available !== false && (
           <InfoTile
             label="MX Record"
@@ -146,7 +107,6 @@ export default function ResultCard({ result }) {
           />
         )}
 
-        {/* Typosquatting */}
         {typo.is_typosquat && (
           <InfoTile
             label="Typosquat"
@@ -156,9 +116,6 @@ export default function ResultCard({ result }) {
         )}
       </div>
 
-      {/* ============================================ */}
-      {/* OBFUSCATION TECHNIQUES                       */}
-      {/* ============================================ */}
       {obfuscation_found.length > 0 && (
         <div className="mb-3">
           <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">Obfuscation Detected</p>
@@ -172,9 +129,6 @@ export default function ResultCard({ result }) {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* SCANNED URL                                  */}
-      {/* ============================================ */}
       <div className="pt-3 border-t border-white/5">
         <p className="text-[10px] text-[var(--color-text-muted)] break-all">{url}</p>
         {cleaned_url !== url && (
@@ -186,10 +140,6 @@ export default function ResultCard({ result }) {
     </div>
   );
 }
-
-// =====================================================================
-// HELPER: Small info tile used in the grid
-// =====================================================================
 
 function InfoTile({ label, value, warn = false }) {
   return (
