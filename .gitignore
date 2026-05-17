@@ -5,3 +5,4 @@ __pycache__/
 ml/data/*.csv
 .env
 venv/
+.cph/
