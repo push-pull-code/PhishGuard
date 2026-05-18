@@ -1,54 +1,74 @@
-# PhishGuard
+# PhishGuard 🛡️
 
-PhishGuard is a phishing detection system leveraging Machine Learning and external threat intelligence (VirusTotal, URLhaus) with real-time domain forensics (WHOIS, DNS, typosquatting).
+PhishGuard is a high-performance browser extension and machine learning pipeline designed for real-time phishing detection. It uses a hybrid approach of ML inference, dataset matching (OpenPhish, ISCX, URLhaus, Tranco), and domain forensics (WHOIS, DNS, Typosquatting) to classify URLs in under 500ms.
 
-### Components
-1. **Machine Learning Pipeline**: XGBoost model trained on phishing and legitimate URLs.
-2. **FastAPI Backend**: Serves the model, runs parallel forensics, and hosts the dashboard.
-3. **Web Dashboard**: Glassmorphism UI served directly from FastAPI (no Node.js required).
-4. **Chrome Extension**: Real-time browser scanning.
+## Architecture
+- **Frontend:** Chrome Extension (`manifest V3`, Vanilla JS/HTML/Tailwind) with an IndexedDB client-side cache and auto-scan background worker.
+- **Backend:** Python FastAPI server with an LRU cache, dataset lookup service (O(1) hash-map matching), and parallelized external intel gathering.
+- **ML Pipeline:** XGBoost classifier utilizing 22 URL features (entropy, digit ratios, path depths, etc).
 
----
+## Installation
 
-## 1. Setup & Installation
+### 1. Setup the Backend
+Make sure you have Python 3.9+ installed.
 
 ```bash
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-# source venv/bin/activate
+# Clone the repository
+git clone https://github.com/yourusername/PhishGuard.git
+cd PhishGuard
 
-pip install -r backend/requirements.txt
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-cp backend/.env.example backend/.env
-# Add your VirusTotal API key to backend/.env
+# Install the dependencies
+pip install -r requirements.txt
 ```
 
-## 2. Download Datasets
-
-Place the following datasets in `ml/data/`:
-1. **ISCX URL 2016**: [Link](https://www.kaggle.com/datasets/teseract/urldataset) -> `ml/data/iscx_url_2016.csv`
-2. **Tranco Top 1M**: [Link](https://tranco-list.eu/) -> `ml/data/tranco_top1m.csv`
-
-## 3. Train the Model
-
+### 2. Download Datasets and Train Model (Optional)
+If you want to train the model from scratch, place your CSV datasets (`iscx_url_2016.csv`, `urlhaus.csv`, `phishtank.csv`, `tranco_top1m.csv`) into the `ml/data/` folder and run:
 ```bash
 python ml/train.py
 ```
-This generates `model.pkl` and `features.json` in the `ml/` directory.
+*(A pre-trained `model.pkl` is already built into the pipeline).*
 
-## 4. Run the Backend
-
+### 3. Run the API Server
+Start the FastAPI server:
 ```bash
 python backend/main.py
 ```
-The FastAPI server will start on `http://0.0.0.0:8000`.
-The dashboard is available at `http://localhost:8000`.
+Checking ports in use:
+```bash
+lsof -i :8000
+```
+For stoping ports in use:
+```bash
+kill -9 $(lsof -t -i:8000)
+```
+Run on another port:
+```bash
+uvicorn main:app --reload --port 8001
+```
+The server will run at `http://localhost:8000`.
 
-## 6. Chrome Extension
+### 4. Install the Chrome Extension
+1. Open Google Chrome and navigate to `chrome://extensions/`.
+2. Enable **Developer Mode** in the top right corner.
+3. Click **Load unpacked** and select the `extension/` folder in this repository.
+4. Pin the PhishGuard icon to your toolbar.
 
-1. Go to `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Click **Load unpacked** and select the `extension/` directory.
+## Usage
+The extension automatically monitors pages you navigate to and changes color to indicate safety:
+- 🟢 **Green**: Safe / Genuine
+- 🟠 **Orange**: Suspicious / Caution
+- 🔴 **Red**: Phishing / Malware
+- ⚪ **Grey**: Inactive / Internal page
 
+Click the extension icon at any time to see a detailed breakdown of the threat score, ML confidence, and domain forensics.
+
+## Cache Management
+To clear the backend in-memory cache:
+```bash
+curl -X DELETE http://localhost:8000/scan/cache
+```
+To clear the extension cache for a single URL, click the **Rescan** button in the popup.

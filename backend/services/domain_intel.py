@@ -76,6 +76,7 @@ def detect_typosquatting(domain: str) -> dict:
         # e.g. en.wikipedia.org -> wikipedia
         domain_base = parts[-2].lower() if len(parts) >= 2 else parts[0].lower()
     
+    # 1. Check exact match or typosquat on the full domain base
     best_match: Optional[str] = None
     best_distance: int = 999
     for legit_domain in _TOP_DOMAINS:
@@ -87,10 +88,27 @@ def detect_typosquatting(domain: str) -> dict:
             
         if domain_base == legit_base:
             return {'is_typosquat': False, 'closest_match': legit_domain, 'edit_distance': 0, 'original_brand': None}
+        
+        # Check full domain base typosquatting
         dist = Levenshtein.distance(domain_base, legit_base)
         if dist < best_distance:
             best_distance = dist
             best_match = legit_domain
+
+        # 2. Check hyphenated parts of domain base (e.g. paypa1-security-verification)
+        if '-' in domain_base:
+            sub_parts = [p for p in domain_base.split('-') if len(p) >= 4]
+            for part in sub_parts:
+                part_dist = Levenshtein.distance(part, legit_base)
+                # If a subpart matches a known brand exactly, or is a 1-character typosquat
+                if (part_dist <= 1 and len(legit_base) >= 4) or (part == legit_base):
+                    return {
+                        'is_typosquat': True,
+                        'closest_match': legit_domain,
+                        'edit_distance': part_dist,
+                        'original_brand': legit_domain
+                    }
+                    
     is_typosquat = best_distance <= 2
     return {'is_typosquat': is_typosquat, 'closest_match': best_match, 'edit_distance': best_distance, 'original_brand': best_match if is_typosquat else None}
 

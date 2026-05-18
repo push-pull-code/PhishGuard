@@ -11,8 +11,19 @@
     "subdomain_depth",
     "has_ip_address",
     "has_https",
-    "shannon_entropy",
     "domain_length",
-    "is_common_tld"
+    "is_common_tld",
+    "shannon_entropy",
+    "path_length",
+    "path_depth",
+    "num_digits_in_domain",
+    "digit_ratio",
+    "num_subdomains",
+    "has_port",
+    "has_double_slash_redirect",
+    "has_shortener",
+    "vowel_consonant_ratio",
+    "brand_in_subdomain",
+    "is_suspicious_tld"
   ]
 }

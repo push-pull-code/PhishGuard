@@ -85,7 +85,17 @@ def combine_final_score(ml_confidence: float, threat_intel: dict, forensics: dic
     if uh.get('is_known_malicious'):
         tags = ', '.join(uh.get('tags', [])) or 'unknown'
         reasons.append(f'URLhaus: known malicious URL (tags: {tags})')
-    raw_score = ml_score * 0.4 + vt_ratio * 0.4 + uh_flag * 0.2
+    # Dynamic weighting based on availability of external APIs
+    ml_weight = 0.4
+    vt_weight = 0.4 if (vt.get('available') and vt_total > 0) else 0.0
+    uh_weight = 0.2 if uh.get('available') else 0.0
+    
+    total_weight = ml_weight + vt_weight + uh_weight
+    if total_weight > 0:
+        raw_score = (ml_score * ml_weight + vt_ratio * vt_weight + uh_flag * uh_weight) / total_weight
+    else:
+        raw_score = ml_score
+
     forensics_penalty = 0.0
     typo = forensics.get('typosquatting', {})
     if typo.get('is_typosquat'):
@@ -112,11 +122,19 @@ def combine_final_score(ml_confidence: float, threat_intel: dict, forensics: dic
         forensics_penalty += 0.1
         reasons.append('Missing mail records on a young domain is highly suspicious')
     final_score_raw = raw_score + forensics_penalty
-    score = int(round(final_score_raw * 100))
+    # Invert: 100 = safest, 0 = most dangerous
+    score = 100 - int(round(final_score_raw * 100))
+    
+    # Ensure high ML confidence is respected (not drowned out by clean/missing external APIs)
+    if ml_confidence >= 0.8:
+        score = min(score, 29)  # Force Malicious (red)
+    elif ml_confidence >= 0.5:
+        score = min(score, 59)  # Force Suspicious (orange)
+
     score = max(0, min(100, score))
-    if score <= 35:
+    if score >= 60:
         threat_level = 'safe'
-    elif score <= 65:
+    elif score >= 30:
         threat_level = 'suspicious'
     else:
         threat_level = 'malicious'

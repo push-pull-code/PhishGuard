@@ -1,26 +1,35 @@
-
+/**
+ * PhishGuard — Popup UI Controller
+ * ==================================
+ * Shows scan results for the current tab.
+ * Reads cached result from background service worker (IndexedDB).
+ * If no cached result, triggers a scan via the background worker.
+ */
 
 const API_BASE = "http://localhost:8000";
 
+// ── DOM references ──
+const $currentUrl = document.getElementById("current-url");
+const $loadingState = document.getElementById("loading-state");
+const $resultCard = document.getElementById("result-card");
+const $errorState = document.getElementById("error-state");
+const $errorTitle = document.getElementById("error-title");
+const $errorDetail = document.getElementById("error-detail");
+const $rescanBtn = document.getElementById("rescan-btn");
 
-const $currentUrl    = document.getElementById("current-url");
-const $loadingState  = document.getElementById("loading-state");
-const $resultCard    = document.getElementById("result-card");
-const $errorState    = document.getElementById("error-state");
-const $errorTitle    = document.getElementById("error-title");
-const $errorDetail   = document.getElementById("error-detail");
-const $rescanBtn     = document.getElementById("rescan-btn");
-
-const $threatBadge   = document.getElementById("threat-badge");
-const $threatIcon    = document.getElementById("threat-icon");
-const $threatLabel   = document.getElementById("threat-label");
-const $threatScore   = document.getElementById("threat-score");
+const $threatBadge = document.getElementById("threat-badge");
+const $threatIcon = document.getElementById("threat-icon");
+const $threatLabel = document.getElementById("threat-label");
+const $threatScore = document.getElementById("threat-score");
 const $confidenceText = document.getElementById("confidence-text");
-const $reasonsList   = document.getElementById("reasons-list");
+const $reasonsList = document.getElementById("reasons-list");
 const $forensicsGrid = document.getElementById("forensics-grid");
-const $responseTime  = document.getElementById("response-time");
+const $responseTime = document.getElementById("response-time");
 
 
+// ══════════════════════════════════════════════════════════════
+// State helpers
+// ══════════════════════════════════════════════════════════════
 
 function showLoading() {
   $loadingState.classList.remove("hidden");
@@ -46,6 +55,9 @@ function showError(title, detail) {
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// Threat level styling
+// ══════════════════════════════════════════════════════════════
 
 const THREAT_STYLES = {
   safe: {
@@ -72,21 +84,38 @@ const THREAT_STYLES = {
 };
 
 
+// ══════════════════════════════════════════════════════════════
+// Result renderer
+// ══════════════════════════════════════════════════════════════
 
 function renderResult(data) {
-  const level = data.threat_score?.threat_level || "safe";
+  const threatData = data.final || data.threat_score || {};
+  const level = threatData.threat_level || "safe";
   const style = THREAT_STYLES[level] || THREAT_STYLES.safe;
 
+  // Threat badge
   $threatBadge.className = `rounded-xl p-4 mb-3 border ${style.borderClass} ${style.bgClass}`;
   $threatIcon.textContent = style.icon;
   $threatLabel.textContent = level.toUpperCase();
   $threatLabel.className = `text-sm font-bold uppercase tracking-wider ${style.labelColor}`;
-  $threatScore.textContent = `${data.threat_score?.score ?? 0}/100`;
+  $threatScore.textContent = `${threatData.score ?? 0}/100`;
   $threatScore.className = `text-2xl font-bold ${style.scoreColor}`;
-  $confidenceText.textContent = `ML confidence: ${(data.confidence * 100).toFixed(1)}%`;
 
+  // Confidence: prefer dataset_match.confidence, then ml.confidence
+  const confPct = (data.dataset_match?.found && data.dataset_match?.confidence)
+    ? data.dataset_match.confidence
+    : (data.ml?.confidence ?? data.confidence ?? 0);
+  const confDisplay = (confPct * 100).toFixed(1);
+
+  // Source label
+  const srcLabel = data.source === 'cache' ? '⚡ Cached'
+    : data.source === 'dataset' ? '📂 Dataset match'
+      : '🤖 ML inference';
+  $confidenceText.textContent = `${srcLabel}  •  Confidence: ${confDisplay}%`;
+
+  // Reasons
   $reasonsList.innerHTML = "";
-  const reasons = data.threat_score?.reasons || ["No threats detected"];
+  const reasons = threatData.reasons || ["No threats detected"];
   for (const reason of reasons) {
     const li = document.createElement("li");
     li.className = "flex items-start gap-1.5";
@@ -94,9 +123,9 @@ function renderResult(data) {
     $reasonsList.appendChild(li);
   }
 
+  // Forensics grid
   $forensicsGrid.innerHTML = "";
   const forensics = data.forensics || {};
-
   const gridItems = [];
 
   const whois = forensics.whois || {};
@@ -145,70 +174,100 @@ function renderResult(data) {
     $forensicsGrid.appendChild(div);
   }
 
-  $responseTime.textContent = `Scanned in ${data.response_time_ms?.toFixed(0) || "?"}ms`;
+  // Dataset match info
+  const dsMatch = data.dataset_match;
+  if (dsMatch && dsMatch.found) {
+    const dsDiv = document.createElement('div');
+    dsDiv.className = `bg-slate-800/60 rounded-lg px-2.5 py-2 border border-indigo-500/30`;
+    dsDiv.innerHTML = `
+      <p class="text-[10px] uppercase tracking-wider text-slate-500">Dataset</p>
+      <p class="text-xs font-medium text-indigo-300">${dsMatch.source} → ${dsMatch.label}</p>
+    `;
+    $forensicsGrid.appendChild(dsDiv);
+  }
+
+  // Response time — show original backend scan time & source
+  const timeMs = data.response_time_ms;
+  const srcSuffix = data.source === 'dataset' ? ' (dataset)'
+    : data.source === 'ml' ? ' (ML inference)'
+      : '';
+
+  if (timeMs != null) {
+    $responseTime.textContent = `Scanned in ${timeMs.toFixed(0)}ms${srcSuffix}`;
+  } else {
+    $responseTime.textContent = '';
+  }
 
   showResult();
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// Scan logic
+// ══════════════════════════════════════════════════════════════
 
-async function scanUrl(url) {
+async function scanUrl(url, forceRescan = false) {
   showLoading();
 
-  try {
-    const cached = await new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { action: "getCachedResult", url },
-        (response) => resolve(response)
-      );
+  // If rescan requested, clear extension cache first
+  if (forceRescan) {
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "clearCache", url }, () => resolve());
     });
-
-    if (cached && cached.result) {
-      renderResult(cached.result);
-      $responseTime.textContent += " (cached)";
-      return;
-    }
-  } catch {
   }
 
-  try {
-    const res = await fetch(`${API_BASE}/scan/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
+  // 1. Read from IndexedDB — background.js already scanned on page load
+  if (!forceRescan) {
+    try {
+      const cached = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { action: "getCachedResult", url },
+          (response) => resolve(response)
+        );
+      });
 
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      if (cached && cached.result) {
+        // Show original scan result as-is (original time & source from backend)
+        renderResult(cached.result);
+        return;
+      }
+    } catch {
+      // fall through
     }
+  }
 
-    const data = await res.json();
-    renderResult(data);
-
-    chrome.runtime.sendMessage({
-      action: "cacheResult",
-      url,
-      result: data,
+  // 2. No cached result yet — ask background worker to scan (popup never calls backend)
+  try {
+    const result = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: "scanUrl", url },
+        (response) => {
+          if (response && response.result) {
+            resolve(response.result);
+          } else {
+            reject(new Error("Scan failed"));
+          }
+        }
+      );
     });
 
+    renderResult(result);
   } catch (err) {
     console.error("Scan failed:", err);
-
-    if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-      showError(
-        "Backend not running",
-        `Start the API server with:<br/>
-         <code class="bg-slate-800 px-2 py-0.5 rounded text-[11px] mt-1 inline-block">
-           python backend/main.py
-         </code>`
-      );
-    } else {
-      showError("Scan failed", `<span class="text-xs text-slate-500">${err.message}</span>`);
-    }
+    showError(
+      "Scan failed",
+      `<span class="text-xs text-slate-500">Backend may not be running. Start with:<br/>
+       <code class="bg-slate-800 px-2 py-0.5 rounded text-[11px] mt-1 inline-block">
+         python backend/main.py
+       </code></span>`
+    );
   }
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
 
 document.addEventListener("DOMContentLoaded", () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -233,8 +292,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $rescanBtn.addEventListener("click", () => {
     const url = $currentUrl.textContent;
     if (url && url !== "Loading…") {
-      chrome.runtime.sendMessage({ action: "clearCache", url });
-      scanUrl(url);
+      // Clear cache then rescan
+      chrome.runtime.sendMessage({ action: "clearCache", url }, () => {
+        scanUrl(url, true);
+      });
     }
   });
 });

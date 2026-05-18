@@ -145,8 +145,20 @@ def train(feature_df: pd.DataFrame) -> None:
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     print(f'\n[*] Training set : {len(X_train)} samples')
     print(f'[*] Test set     : {len(X_test)} samples')
-    model = XGBClassifier(n_estimators=200, max_depth=6, learning_rate=0.1, use_label_encoder=False, eval_metric='logloss', random_state=42)
-    print('\n[*] Training XGBoost (n_estimators=200, max_depth=6) …')
+    model = XGBClassifier(
+        n_estimators=500,
+        max_depth=8,
+        learning_rate=0.05,
+        use_label_encoder=False,
+        eval_metric='logloss',
+        random_state=42,
+        reg_alpha=0.1,        # L1 regularisation
+        reg_lambda=1.0,       # L2 regularisation
+        min_child_weight=3,
+        subsample=0.8,
+        colsample_bytree=0.8,
+    )
+    print('\n[*] Training XGBoost (n_estimators=500, max_depth=8, lr=0.05) …')
     start = time.time()
     model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
     elapsed = time.time() - start
