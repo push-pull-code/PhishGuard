@@ -88,7 +88,7 @@ const THREAT_STYLES = {
 // Result renderer
 // ══════════════════════════════════════════════════════════════
 
-function renderResult(data, fromCache = false) {
+function renderResult(data) {
   const threatData = data.final || data.threat_score || {};
   const level = threatData.threat_level || "safe";
   const style = THREAT_STYLES[level] || THREAT_STYLES.safe;
@@ -186,12 +186,11 @@ function renderResult(data, fromCache = false) {
     $forensicsGrid.appendChild(dsDiv);
   }
 
-  // Response time
+  // Response time — show original backend scan time & source
   const timeMs = data.response_time_ms;
-  const srcSuffix = fromCache ? ' (from extension cache)'
-    : data.source === 'cache' ? ' (server cache)'
-      : data.source === 'dataset' ? ' (dataset)'
-        : '';
+  const srcSuffix = data.source === 'dataset' ? ' (dataset)'
+    : data.source === 'ml' ? ' (ML inference)'
+      : '';
 
   if (timeMs != null) {
     $responseTime.textContent = `Scanned in ${timeMs.toFixed(0)}ms${srcSuffix}`;
@@ -210,10 +209,16 @@ function renderResult(data, fromCache = false) {
 async function scanUrl(url, forceRescan = false) {
   showLoading();
 
-  // 1. Check extension cache (IndexedDB via background worker)
+  // If rescan requested, clear extension cache first
+  if (forceRescan) {
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "clearCache", url }, () => resolve());
+    });
+  }
+
+  // 1. Read from IndexedDB — background.js already scanned on page load
   if (!forceRescan) {
     try {
-      const t0 = performance.now();
       const cached = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
           { action: "getCachedResult", url },
@@ -222,59 +227,40 @@ async function scanUrl(url, forceRescan = false) {
       });
 
       if (cached && cached.result) {
-        cached.result.response_time_ms = performance.now() - t0;
-        renderResult(cached.result, true);
+        // Show original scan result as-is (original time & source from backend)
+        renderResult(cached.result);
         return;
       }
     } catch {
-      // Fall through to API call
+      // fall through
     }
   }
 
-  // 2. Call backend API directly from popup for fresh results
+  // 2. No cached result yet — ask background worker to scan (popup never calls backend)
   try {
-    const startTime = performance.now();
-
-    const res = await fetch(`${API_BASE}/scan/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+    const result = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: "scanUrl", url },
+        (response) => {
+          if (response && response.result) {
+            resolve(response.result);
+          } else {
+            reject(new Error("Scan failed"));
+          }
+        }
+      );
     });
 
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    const clientTime = performance.now() - startTime;
-
-    // Use client-measured time if server time seems wrong
-    if (!data.response_time_ms || data.response_time_ms <= 0) {
-      data.response_time_ms = clientTime;
-    }
-
-    renderResult(data);
-
-    // Tell background to cache & update icon
-    chrome.runtime.sendMessage({
-      action: "scanUrl",
-      url,
-    });
-
+    renderResult(result);
   } catch (err) {
     console.error("Scan failed:", err);
-
-    if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-      showError(
-        "Backend not running",
-        `Start the API server with:<br/>
-         <code class="bg-slate-800 px-2 py-0.5 rounded text-[11px] mt-1 inline-block">
-           python backend/main.py
-         </code>`
-      );
-    } else {
-      showError("Scan failed", `<span class="text-xs text-slate-500">${err.message}</span>`);
-    }
+    showError(
+      "Scan failed",
+      `<span class="text-xs text-slate-500">Backend may not be running. Start with:<br/>
+       <code class="bg-slate-800 px-2 py-0.5 rounded text-[11px] mt-1 inline-block">
+         python backend/main.py
+       </code></span>`
+    );
   }
 }
 

@@ -37,6 +37,18 @@ Start the FastAPI server:
 ```bash
 python backend/main.py
 ```
+Checking ports in use:
+```bash
+lsof -i :8000
+```
+For stoping ports in use:
+```bash
+kill -9 $(lsof -t -i:8000)
+```
+Run on another port:
+```bash
+uvicorn main:app --reload --port 8001
+```
 The server will run at `http://localhost:8000`.
 
 ### 4. Install the Chrome Extension

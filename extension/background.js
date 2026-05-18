@@ -173,6 +173,9 @@ function setIconForResult(tabId, result) {
   }
 }
 //scan logic
+// Track in-flight scans to prevent duplicate backend calls
+const _inflight = new Map(); // key → Promise
+
 async function scanUrl(url, tabId) {
   const key = getDomainKey(url);
 
@@ -186,45 +189,64 @@ async function scanUrl(url, tabId) {
     setIconForResult(tabId, cached);
     const label = cached.final?.threat_level?.toUpperCase() || "UNKNOWN";
     const score = cached.final?.score ?? "?";
-    chrome.action.setTitle({ tabId, title: `PhishGuard — ${label} (${score}/100) [cached]` });
+    chrome.action.setTitle({ tabId, title: `PhishGuard — ${label} (${score}/100)` });
     return cached;
   }
 
-  // 2. Call backend API
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    const res = await fetch(`${API_BASE}/scan/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+  // 2. If a scan is already in-flight for this key, wait for it
+  if (_inflight.has(key)) {
+    const result = await _inflight.get(key);
+    if (result) {
+      setIconForResult(tabId, result);
+      const label = result.final?.threat_level?.toUpperCase() || "UNKNOWN";
+      const score = result.final?.score ?? "?";
+      chrome.action.setTitle({ tabId, title: `PhishGuard — ${label} (${score}/100)` });
     }
-
-    const data = await res.json();
-
-    // Store in IndexedDB
-    await idbPut(key, data);
-
-    // Update icon
-    setIconForResult(tabId, data);
-    const label = data.final?.threat_level?.toUpperCase() || "UNKNOWN";
-    const score = data.final?.score ?? "?";
-    chrome.action.setTitle({ tabId, title: `PhishGuard — ${label} (${score}/100)` });
-
-    return data;
-  } catch (err) {
-    console.warn("PhishGuard scan failed:", err.message);
-    setIconColor(tabId, "grey");
-    chrome.action.setTitle({ tabId, title: "PhishGuard — Backend unavailable" });
-    return null;
+    return result;
   }
+
+  // 3. Call backend API (first caller wins)
+  const scanPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`${API_BASE}/scan/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // Store in IndexedDB
+      await idbPut(key, data);
+
+      // Update icon
+      setIconForResult(tabId, data);
+      const label = data.final?.threat_level?.toUpperCase() || "UNKNOWN";
+      const score = data.final?.score ?? "?";
+      chrome.action.setTitle({ tabId, title: `PhishGuard — ${label} (${score}/100)` });
+
+      return data;
+    } catch (err) {
+      console.warn("PhishGuard scan failed:", err.message);
+      setIconColor(tabId, "grey");
+      chrome.action.setTitle({ tabId, title: "PhishGuard — Backend unavailable" });
+      return null;
+    } finally {
+      _inflight.delete(key);
+    }
+  })();
+
+  _inflight.set(key, scanPromise);
+  return scanPromise;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -240,7 +262,7 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   scanUrl(details.url, details.tabId);
 });
 
-// Also scan when tab becomes active (e.g., switching tabs)
+// Also update icon when tab becomes active (read from cache only, never re-scan)
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
@@ -253,11 +275,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         const score = cached.final?.score ?? "?";
         chrome.action.setTitle({
           tabId: activeInfo.tabId,
-          title: `PhishGuard — ${label} (${score}/100) [cached]`,
+          title: `PhishGuard — ${label} (${score}/100)`,
         });
-      } else {
-        scanUrl(tab.url, activeInfo.tabId);
       }
+      // Don't scan again — onCommitted already handles it
     }
   } catch {
     // Tab may have been closed
