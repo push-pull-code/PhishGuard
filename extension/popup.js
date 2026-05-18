@@ -113,7 +113,7 @@ function renderResult(data) {
   }
 
   const dnsData = forensics.dns || {};
-  if (dnsData.available !== false) {
+  if (dnsData.available) {
     gridItems.push({
       label: "A Record",
       value: dnsData.has_a_record ? "Yes ✓" : "No ✗",

@@ -103,7 +103,7 @@ function renderResult(data) {
   if (vt.available) tiles += infoTile('VirusTotal', `${vt.malicious_count||0}/${vt.total_engines||0} flagged`, vt.malicious_count > 0);
   if (uh.available) tiles += infoTile('URLhaus', uh.is_known_malicious ? 'Known malicious' : 'Not listed', uh.is_known_malicious);
   if (whois.available) tiles += infoTile('Domain Age', whois.domain_age_days != null ? `${whois.domain_age_days} days` : 'Unknown', whois.is_newly_registered);
-  if (dns.available !== false) tiles += infoTile('MX Record', dns.has_mx_record ? 'Present ✓' : 'Missing ✗', !dns.has_mx_record);
+  if (dns.available) tiles += infoTile('MX Record', dns.has_mx_record ? 'Present ✓' : 'Missing ✗', !dns.has_mx_record);
   if (typo.is_typosquat) tiles += infoTile('Typosquat', `→ ${typo.original_brand} (dist ${typo.edit_distance})`, true);
   if (tiles) html += `<div class="info-grid">${tiles}</div>`;
 
