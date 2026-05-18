@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
 from xgboost import XGBClassifier
 from feature_extractor import extract_features
+
 _DIR = os.path.dirname(os.path.abspath(__file__))
 FEATURES_JSON_PATH = os.path.join(_DIR, 'features.json')
 MODEL_OUTPUT_PATH = os.path.join(_DIR, 'model.pkl')
@@ -65,6 +66,7 @@ def load_and_combine(data_dir: str) -> pd.DataFrame:
     tranco_path = os.path.join(data_dir, 'tranco_top1m.csv')
     phishtank_path = os.path.join(data_dir, 'phishtank.csv')
     urlhaus_path = os.path.join(data_dir, 'urlhaus.csv')
+
     if os.path.isfile(iscx_path):
         print(f'[+] Loading ISCX-URL-2016 from {iscx_path}')
         frames.append(load_iscx(iscx_path))
@@ -90,10 +92,11 @@ def load_and_combine(data_dir: str) -> pd.DataFrame:
         frames.append(load_tranco(tranco_path))
     else:
         print(f'[!] Tranco Top-1M not found at {tranco_path} — skipping')
+
     if not frames:
-        print('[ERROR] No datasets found.  See the DOWNLOAD INSTRUCTIONS at')
-        print('        the top of this file, place CSVs in ml/data/, then re-run.')
+        print('[ERROR] No datasets found.')
         sys.exit(1)
+        
     combined = pd.concat(frames, ignore_index=True)
     combined.drop_duplicates(subset='url', inplace=True)
     return combined
@@ -131,11 +134,10 @@ def build_feature_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return feature_df
 
 def save_feature_order(columns: list[str]) -> None:
-    payload = {'_FILE': 'features.json', '_PURPOSE': 'Ordered list of feature columns — MUST match model.pkl', '_CONNECTS_TO': 'ml/feature_extractor.py, ml/train.py', 'features': columns}
+    payload = {'_FILE': 'features.json', '_PURPOSE': 'Ordered list of feature columns', 'features': columns}
     with open(FEATURES_JSON_PATH, 'w') as f:
         json.dump(payload, f, indent=2)
     print(f'\n[+] Feature order saved to {FEATURES_JSON_PATH}')
-    print(f'    Columns ({len(columns)}): {columns}')
 
 def train(feature_df: pd.DataFrame) -> None:
     feature_cols = [c for c in feature_df.columns if c != 'label']
@@ -143,8 +145,10 @@ def train(feature_df: pd.DataFrame) -> None:
     y = feature_df['label']
     save_feature_order(feature_cols)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    
     print(f'\n[*] Training set : {len(X_train)} samples')
     print(f'[*] Test set     : {len(X_test)} samples')
+    
     model = XGBClassifier(
         n_estimators=500,
         max_depth=8,
@@ -152,23 +156,26 @@ def train(feature_df: pd.DataFrame) -> None:
         use_label_encoder=False,
         eval_metric='logloss',
         random_state=42,
-        reg_alpha=0.1,        # L1 regularisation
-        reg_lambda=1.0,       # L2 regularisation
+        reg_alpha=0.1,
+        reg_lambda=1.0,
         min_child_weight=3,
         subsample=0.8,
         colsample_bytree=0.8,
     )
+    
     print('\n[*] Training XGBoost (n_estimators=500, max_depth=8, lr=0.05) …')
     start = time.time()
     model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
     elapsed = time.time() - start
     print(f'[+] Training complete in {elapsed:.1f}s')
+    
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred)
     rec = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
+    
     print('\n' + '=' * 60)
     print('  EVALUATION RESULTS')
     print('=' * 60)
@@ -182,22 +189,12 @@ def train(feature_df: pd.DataFrame) -> None:
     print(f'    FN={cm[1][0]:>6}   TP={cm[1][1]:>6}')
     print()
     print(classification_report(y_test, y_pred, target_names=['legit', 'phishing']))
+    
     if acc >= ACCURACY_TARGET:
-        print(f'[PASS] Accuracy {acc:.4f} meets the >={ACCURACY_TARGET} target!')
+        print(f'[PASS] Accuracy {acc:.4f} meets target!')
     else:
-        print(f'[FAIL] Accuracy {acc:.4f} is BELOW the >={ACCURACY_TARGET} target.')
-        print()
-        print('  SUGGESTIONS TO IMPROVE:')
-        print('  1. Add more training data — especially diverse phishing samples')
-        print('     from OpenPhish + ISCX.')
-        print('  2. Engineer more features — e.g. WHOIS age, page-content')
-        print('     similarity, redirect-chain depth.')
-        print('  3. Tune hyperparameters — try n_estimators=500, max_depth=8,')
-        print('     learning_rate=0.05, add regularisation (reg_alpha, reg_lambda).')
-        print('  4. Use cross-validation (sklearn.model_selection.cross_val_score)')
-        print('     instead of a single train/test split for more stable estimates.')
-        print('  5. Inspect the confusion matrix: if FN is high, the model needs')
-        print('     more phishing examples or a lower classification threshold.')
+        print(f'[FAIL] Accuracy {acc:.4f} is below target.')
+        
     joblib.dump(model, MODEL_OUTPUT_PATH)
     print(f'\n[+] Model saved to {MODEL_OUTPUT_PATH}')
 
@@ -211,5 +208,6 @@ def main():
     feature_df = build_feature_dataframe(balanced_df)
     train(feature_df)
     print('\n[PASS] Pipeline complete.')
+
 if __name__ == '__main__':
     main()

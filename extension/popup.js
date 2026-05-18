@@ -1,14 +1,5 @@
-/**
- * PhishGuard — Popup UI Controller
- * ==================================
- * Shows scan results for the current tab.
- * Reads cached result from background service worker (IndexedDB).
- * If no cached result, triggers a scan via the background worker.
- */
-
 const API_BASE = "http://localhost:8000";
 
-// ── DOM references ──
 const $currentUrl = document.getElementById("current-url");
 const $loadingState = document.getElementById("loading-state");
 const $resultCard = document.getElementById("result-card");
@@ -25,11 +16,6 @@ const $confidenceText = document.getElementById("confidence-text");
 const $reasonsList = document.getElementById("reasons-list");
 const $forensicsGrid = document.getElementById("forensics-grid");
 const $responseTime = document.getElementById("response-time");
-
-
-// ══════════════════════════════════════════════════════════════
-// State helpers
-// ══════════════════════════════════════════════════════════════
 
 function showLoading() {
   $loadingState.classList.remove("hidden");
@@ -53,11 +39,6 @@ function showError(title, detail) {
   $errorTitle.textContent = title;
   if (detail) $errorDetail.innerHTML = detail;
 }
-
-
-// ══════════════════════════════════════════════════════════════
-// Threat level styling
-// ══════════════════════════════════════════════════════════════
 
 const THREAT_STYLES = {
   safe: {
@@ -83,17 +64,11 @@ const THREAT_STYLES = {
   },
 };
 
-
-// ══════════════════════════════════════════════════════════════
-// Result renderer
-// ══════════════════════════════════════════════════════════════
-
 function renderResult(data) {
   const threatData = data.final || data.threat_score || {};
   const level = threatData.threat_level || "safe";
   const style = THREAT_STYLES[level] || THREAT_STYLES.safe;
 
-  // Threat badge
   $threatBadge.className = `rounded-xl p-4 mb-3 border ${style.borderClass} ${style.bgClass}`;
   $threatIcon.textContent = style.icon;
   $threatLabel.textContent = level.toUpperCase();
@@ -101,19 +76,16 @@ function renderResult(data) {
   $threatScore.textContent = `${threatData.score ?? 0}/100`;
   $threatScore.className = `text-2xl font-bold ${style.scoreColor}`;
 
-  // Confidence: prefer dataset_match.confidence, then ml.confidence
   const confPct = (data.dataset_match?.found && data.dataset_match?.confidence)
     ? data.dataset_match.confidence
     : (data.ml?.confidence ?? data.confidence ?? 0);
   const confDisplay = (confPct * 100).toFixed(1);
 
-  // Source label
   const srcLabel = data.source === 'cache' ? '⚡ Cached'
     : data.source === 'dataset' ? '📂 Dataset match'
       : '🤖 ML inference';
   $confidenceText.textContent = `${srcLabel}  •  Confidence: ${confDisplay}%`;
 
-  // Reasons
   $reasonsList.innerHTML = "";
   const reasons = threatData.reasons || ["No threats detected"];
   for (const reason of reasons) {
@@ -123,7 +95,6 @@ function renderResult(data) {
     $reasonsList.appendChild(li);
   }
 
-  // Forensics grid
   $forensicsGrid.innerHTML = "";
   const forensics = data.forensics || {};
   const gridItems = [];
@@ -174,7 +145,6 @@ function renderResult(data) {
     $forensicsGrid.appendChild(div);
   }
 
-  // Dataset match info
   const dsMatch = data.dataset_match;
   if (dsMatch && dsMatch.found) {
     const dsDiv = document.createElement('div');
@@ -186,7 +156,6 @@ function renderResult(data) {
     $forensicsGrid.appendChild(dsDiv);
   }
 
-  // Response time — show original backend scan time & source
   const timeMs = data.response_time_ms;
   const srcSuffix = data.source === 'dataset' ? ' (dataset)'
     : data.source === 'ml' ? ' (ML inference)'
@@ -201,22 +170,15 @@ function renderResult(data) {
   showResult();
 }
 
-
-// ══════════════════════════════════════════════════════════════
-// Scan logic
-// ══════════════════════════════════════════════════════════════
-
 async function scanUrl(url, forceRescan = false) {
   showLoading();
 
-  // If rescan requested, clear extension cache first
   if (forceRescan) {
     await new Promise((resolve) => {
       chrome.runtime.sendMessage({ action: "clearCache", url }, () => resolve());
     });
   }
 
-  // 1. Read from IndexedDB — background.js already scanned on page load
   if (!forceRescan) {
     try {
       const cached = await new Promise((resolve) => {
@@ -227,16 +189,13 @@ async function scanUrl(url, forceRescan = false) {
       });
 
       if (cached && cached.result) {
-        // Show original scan result as-is (original time & source from backend)
         renderResult(cached.result);
         return;
       }
     } catch {
-      // fall through
     }
   }
 
-  // 2. No cached result yet — ask background worker to scan (popup never calls backend)
   try {
     const result = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -264,11 +223,6 @@ async function scanUrl(url, forceRescan = false) {
   }
 }
 
-
-// ══════════════════════════════════════════════════════════════
-// Init
-// ══════════════════════════════════════════════════════════════
-
 document.addEventListener("DOMContentLoaded", () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tab = tabs[0];
@@ -292,7 +246,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $rescanBtn.addEventListener("click", () => {
     const url = $currentUrl.textContent;
     if (url && url !== "Loading…") {
-      // Clear cache then rescan
       chrome.runtime.sendMessage({ action: "clearCache", url }, () => {
         scanUrl(url, true);
       });

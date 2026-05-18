@@ -1,10 +1,9 @@
-
 const API_BASE = "http://localhost:8000";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const DB_NAME = "PhishGuardCache";
 const DB_VERSION = 1;
 const STORE_NAME = "scanResults";
-//indexDB 
+
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -102,13 +101,11 @@ function isScannableUrl(url) {
     return false;
   }
 }
-//icon colour control
+
 function setIconColor(tabId, color) {
-  // color: "green", "orange", "red", "grey"
   const canvas = new OffscreenCanvas(32, 32);
   const ctx = canvas.getContext("2d");
 
-  // Shield shape
   const colors = {
     green: { fill: "#22c55e", stroke: "#16a34a", glow: "rgba(34,197,94,0.3)" },
     orange: { fill: "#f59e0b", stroke: "#d97706", glow: "rgba(245,158,11,0.3)" },
@@ -117,14 +114,10 @@ function setIconColor(tabId, color) {
   };
   const c = colors[color] || colors.grey;
 
-  // Draw shield icon
   ctx.clearRect(0, 0, 32, 32);
-
-  // Glow
   ctx.shadowColor = c.glow;
   ctx.shadowBlur = 4;
 
-  // Shield body
   ctx.beginPath();
   ctx.moveTo(16, 2);
   ctx.quadraticCurveTo(4, 4, 4, 12);
@@ -139,7 +132,6 @@ function setIconColor(tabId, color) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Inner symbol
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 14px sans-serif";
   ctx.textAlign = "center";
@@ -172,18 +164,15 @@ function setIconForResult(tabId, result) {
     setIconColor(tabId, "red");
   }
 }
-//scan logic
-// Track in-flight scans to prevent duplicate backend calls
-const _inflight = new Map(); // key → Promise
+
+const _inflight = new Map();
 
 async function scanUrl(url, tabId) {
   const key = getDomainKey(url);
 
-  // Set scanning state
   setIconColor(tabId, "grey");
   chrome.action.setTitle({ tabId, title: "PhishGuard — Scanning…" });
 
-  // 1. Check IndexedDB cache first
   const cached = await idbGet(key);
   if (cached) {
     setIconForResult(tabId, cached);
@@ -193,7 +182,6 @@ async function scanUrl(url, tabId) {
     return cached;
   }
 
-  // 2. If a scan is already in-flight for this key, wait for it
   if (_inflight.has(key)) {
     const result = await _inflight.get(key);
     if (result) {
@@ -205,7 +193,6 @@ async function scanUrl(url, tabId) {
     return result;
   }
 
-  // 3. Call backend API (first caller wins)
   const scanPromise = (async () => {
     try {
       const controller = new AbortController();
@@ -224,11 +211,8 @@ async function scanUrl(url, tabId) {
       }
 
       const data = await res.json();
-
-      // Store in IndexedDB
       await idbPut(key, data);
 
-      // Update icon
       setIconForResult(tabId, data);
       const label = data.final?.threat_level?.toUpperCase() || "UNKNOWN";
       const score = data.final?.score ?? "?";
@@ -249,20 +233,12 @@ async function scanUrl(url, tabId) {
   return scanPromise;
 }
 
-// ══════════════════════════════════════════════════════════════
-// Auto-scan on page navigation
-// ══════════════════════════════════════════════════════════════
-
-// Fires when a navigation is committed (page starts loading)
 chrome.webNavigation.onCommitted.addListener((details) => {
-  // Only main frame, ignore iframes
   if (details.frameId !== 0) return;
   if (!isScannableUrl(details.url)) return;
-
   scanUrl(details.url, details.tabId);
 });
 
-// Also update icon when tab becomes active (read from cache only, never re-scan)
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
@@ -278,16 +254,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
           title: `PhishGuard — ${label} (${score}/100)`,
         });
       }
-      // Don't scan again — onCommitted already handles it
     }
   } catch {
-    // Tab may have been closed
   }
 });
-
-// ══════════════════════════════════════════════════════════════
-// Message API for popup.js
-// ══════════════════════════════════════════════════════════════
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const { action, url } = message;
@@ -297,11 +267,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     idbGet(key).then((result) => {
       sendResponse({ result: result || null });
     });
-    return true; // async response
+    return true;
   }
 
   if (action === "scanUrl") {
-    // Popup requests a fresh scan
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
       if (tab) {
@@ -326,17 +295,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-// ══════════════════════════════════════════════════════════════
-// Lifecycle
-// ══════════════════════════════════════════════════════════════
-
 chrome.runtime.onInstalled.addListener((details) => {
   console.log(`PhishGuard installed (reason: ${details.reason})`);
-  // Clean up expired cache entries
   idbClearExpired();
 });
 
-// Periodic cleanup every 30 minutes
 chrome.alarms.create("cacheCleanup", { periodInMinutes: 30 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "cacheCleanup") {

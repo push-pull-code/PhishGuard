@@ -6,12 +6,14 @@ import whois
 import dns.resolver
 import Levenshtein
 import pandas as pd
+
 logger = logging.getLogger('phishguard.domain_intel')
 _SERVICE_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_SERVICE_DIR)
 _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
 _TRANCO_PATH = os.path.join(_PROJECT_ROOT, 'ml', 'data', 'tranco_top1m.csv')
 _TOP_DOMAINS: list[str] = []
+
 try:
     if os.path.isfile(_TRANCO_PATH):
         _df = pd.read_csv(_TRANCO_PATH, header=None, names=['rank', 'domain'], nrows=10000)
@@ -70,13 +72,10 @@ def detect_typosquatting(domain: str) -> dict:
         return {'is_typosquat': False, 'closest_match': None, 'edit_distance': None, 'original_brand': None, 'note': 'Tranco list not loaded — typosquatting check skipped'}
     parts = domain.split('.')
     if len(parts) >= 3 and parts[-2] in ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac']:
-        # e.g. bbc.co.uk -> bbc
         domain_base = parts[-3].lower()
     else:
-        # e.g. en.wikipedia.org -> wikipedia
         domain_base = parts[-2].lower() if len(parts) >= 2 else parts[0].lower()
     
-    # 1. Check exact match or typosquat on the full domain base
     best_match: Optional[str] = None
     best_distance: int = 999
     for legit_domain in _TOP_DOMAINS:
@@ -89,18 +88,15 @@ def detect_typosquatting(domain: str) -> dict:
         if domain_base == legit_base:
             return {'is_typosquat': False, 'closest_match': legit_domain, 'edit_distance': 0, 'original_brand': None}
         
-        # Check full domain base typosquatting
         dist = Levenshtein.distance(domain_base, legit_base)
         if dist < best_distance:
             best_distance = dist
             best_match = legit_domain
 
-        # 2. Check hyphenated parts of domain base (e.g. paypa1-security-verification)
         if '-' in domain_base:
             sub_parts = [p for p in domain_base.split('-') if len(p) >= 4]
             for part in sub_parts:
                 part_dist = Levenshtein.distance(part, legit_base)
-                # If a subpart matches a known brand exactly, or is a 1-character typosquat
                 if (part_dist <= 1 and len(legit_base) >= 4) or (part == legit_base):
                     return {
                         'is_typosquat': True,
@@ -116,12 +112,12 @@ def run_domain_forensics(domain: str) -> dict:
     try:
         whois_data = get_whois_info(domain)
     except Exception as exc:
-        logger.error('WHOIS unexpected error for %s: %s', domain, exc)
+        logger.error('WHOIS error for %s: %s', domain, exc)
         whois_data = {'registrar': None, 'creation_date': None, 'domain_age_days': None, 'is_newly_registered': False, 'available': False, 'error': str(exc)}
     try:
         dns_data = get_dns_records(domain)
     except Exception as exc:
-        logger.error('DNS unexpected error for %s: %s', domain, exc)
+        logger.error('DNS error for %s: %s', domain, exc)
         dns_data = {'has_a_record': False, 'has_mx_record': False, 'nameservers': [], 'ip_addresses': [], 'available': False, 'error': str(exc)}
     try:
         typo_data = detect_typosquatting(domain)

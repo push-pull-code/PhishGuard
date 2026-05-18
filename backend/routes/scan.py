@@ -1,14 +1,3 @@
-"""
-/scan endpoint
-==============
-Flow:
-  1. Check server-side cache  →  if hit, return immediately
-  2. Search URL in datasets   →  if found (phishing/genuine), build result
-  3. Not in dataset            →  run ML model + threat intel + forensics
-  4. Store result in cache
-  5. Return result
-"""
-
 import asyncio
 import time
 from typing import Any
@@ -22,31 +11,23 @@ from services.dataset_lookup import lookup_url
 
 router = APIRouter(prefix='/scan', tags=['Scan'])
 
-
-# ──────────────────────────────────────────────────────────────
-# Request / Response models
-# ──────────────────────────────────────────────────────────────
 class ScanRequest(BaseModel):
     url: str = Field(..., description='The URL to analyse for phishing')
-
 
 class MLResult(BaseModel):
     is_phishing: bool
     confidence: float
-
 
 class ThreatScoreResponse(BaseModel):
     threat_level: str
     score: int
     reasons: list[str]
 
-
 class DatasetInfo(BaseModel):
     found: bool
     source: str = ""
     label: str = ""
     confidence: float = 0.0
-
 
 class ScanResponse(BaseModel):
     url: str
@@ -57,31 +38,24 @@ class ScanResponse(BaseModel):
     forensics: dict[str, Any]
     final: ThreatScoreResponse
     dataset_match: DatasetInfo
-    source: str                     # "cache", "dataset", "ml"
+    source: str
     response_time_ms: float
 
-
-# ──────────────────────────────────────────────────────────────
-# Helper: build a quick result from a dataset match
-# ──────────────────────────────────────────────────────────────
 def _build_dataset_result(url: str, cleaned_url: str, obfuscation_found: list[str],
                           ds_label: str, ds_source: str, ds_confidence: float,
                           elapsed_ms: float) -> dict:
-    """Construct a ScanResponse-compatible dict from a dataset hit."""
-    # Score semantics: 100 = safest, 0 = most dangerous
     if ds_label in ("phishing", "malware"):
         is_phishing = True
         ml_confidence = ds_confidence
         threat_level = "malicious"
         score = 5 if ds_label == "phishing" else 0
-        reasons = [f"URL found in {ds_source} dataset as '{ds_label}' (exact match)"]
+        reasons = [f"URL found in {ds_source} dataset as '{ds_label}'"]
     else:
-        # benign / genuine
         is_phishing = False
         ml_confidence = ds_confidence
         threat_level = "safe"
         score = 95 if ds_source == "iscx" else 90
-        reasons = [f"URL/domain found in {ds_source} dataset as '{ds_label}' (exact match)"]
+        reasons = [f"URL/domain found in {ds_source} dataset as '{ds_label}'"]
 
     return {
         "url": url,
@@ -101,24 +75,19 @@ def _build_dataset_result(url: str, cleaned_url: str, obfuscation_found: list[st
         "response_time_ms": round(elapsed_ms, 2),
     }
 
-
-# ──────────────────────────────────────────────────────────────
-# POST /scan/
-# ──────────────────────────────────────────────────────────────
 @router.post('/')
 async def scan_url(req: ScanRequest, request: Request):
     start = time.perf_counter()
-    cache = request.app.state.cache  # ResultCache instance
+    cache = request.app.state.cache
 
-    # ── 0. Normalise & decode ──
     url_to_scan = req.url.strip()
     if not url_to_scan.startswith(('http://', 'https://')):
         url_to_scan = 'http://' + url_to_scan
+        
     obfus = decode_obfuscation(url_to_scan)
     cleaned_url: str = obfus['cleaned_url']
     obfuscation_found: list[str] = obfus['obfuscation_techniques_found']
 
-    # ── 1. CHECK SERVER-SIDE CACHE ──
     cached = cache.get(cleaned_url)
     if cached is not None:
         elapsed_ms = (time.perf_counter() - start) * 1000.0
@@ -126,7 +95,6 @@ async def scan_url(req: ScanRequest, request: Request):
         cached["source"] = "cache"
         return cached
 
-    # ── 2. DATASET LOOKUP (O(1) hash-set check) ──
     ds_match = lookup_url(cleaned_url)
     if ds_match.found:
         elapsed_ms = (time.perf_counter() - start) * 1000.0
@@ -139,16 +107,13 @@ async def scan_url(req: ScanRequest, request: Request):
             ds_confidence=ds_match.confidence,
             elapsed_ms=elapsed_ms,
         )
-        # Store in cache for subsequent requests
         cache.put(cleaned_url, result, source="dataset")
-        # Store in history
         history: list = request.app.state.scan_history
         history.append(result)
         if len(history) > 100:
             request.app.state.scan_history = history[-100:]
         return result
 
-    # ── 3. ML INFERENCE (dataset miss — full pipeline) ──
     features: dict = extract_features(cleaned_url)
     feature_order: list[str] = request.app.state.feature_order
     aligned_values = [features.get(col, 0) for col in feature_order]
@@ -162,7 +127,6 @@ async def scan_url(req: ScanRequest, request: Request):
         ml_confidence = 0.0
         is_phishing = False
 
-    # ── 3b. Threat intel + forensics (in parallel) ──
     parsed = urlparse(cleaned_url)
     bare_domain = (parsed.netloc or '').split('@')[-1].split(':')[0]
     if bare_domain.startswith('www.'):
@@ -196,7 +160,7 @@ async def scan_url(req: ScanRequest, request: Request):
     if whois_result.get('is_newly_registered'):
         age = whois_result.get('domain_age_days', '?')
         threat_score_data['reasons'].append(
-            f'Domain is newly registered ({age} days old — phishing domains are typically < 180 days)'
+            f'Domain is newly registered ({age} days old)'
         )
     if typo_result.get('is_typosquat'):
         brand = typo_result.get('original_brand', '?')
@@ -207,7 +171,7 @@ async def scan_url(req: ScanRequest, request: Request):
     is_new = domain_age is not None and domain_age < 365
     if dns_result.get('available') and (not dns_result.get('has_mx_record')) and is_new:
         threat_score_data['reasons'].append(
-            'Domain has no MX record and is relatively new — suspicious for a business'
+            'Domain has no MX record and is relatively new'
         )
 
     if threat_score_data['threat_level'] == 'malicious':
@@ -228,10 +192,8 @@ async def scan_url(req: ScanRequest, request: Request):
         "response_time_ms": round(elapsed_ms, 2),
     }
 
-    # ── 4. STORE IN CACHE ──
     cache.put(cleaned_url, result, source="ml")
 
-    # ── 5. Store in history & return ──
     history: list = request.app.state.scan_history
     history.append(result)
     if len(history) > 100:
@@ -239,28 +201,16 @@ async def scan_url(req: ScanRequest, request: Request):
 
     return result
 
-
-# ──────────────────────────────────────────────────────────────
-# GET /scan/history
-# ──────────────────────────────────────────────────────────────
 @router.get('/history')
 async def scan_history(request: Request):
     history: list = request.app.state.scan_history
     return {'count': len(history), 'scans': history}
 
-
-# ──────────────────────────────────────────────────────────────
-# GET /scan/cache-stats
-# ──────────────────────────────────────────────────────────────
 @router.get('/cache-stats')
 async def cache_stats(request: Request):
     cache = request.app.state.cache
     return cache.stats()
 
-
-# ──────────────────────────────────────────────────────────────
-# DELETE /scan/cache  — flush the server cache
-# ──────────────────────────────────────────────────────────────
 @router.delete('/cache')
 async def clear_cache(request: Request):
     cache = request.app.state.cache

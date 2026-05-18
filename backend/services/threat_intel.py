@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import Any
 import httpx
+
 logger = logging.getLogger('phishguard.threat_intel')
 VIRUSTOTAL_API_KEY = os.environ.get('VIRUSTOTAL_API_KEY', '')
 HTTP_TIMEOUT = 5.0
@@ -85,7 +86,7 @@ def combine_final_score(ml_confidence: float, threat_intel: dict, forensics: dic
     if uh.get('is_known_malicious'):
         tags = ', '.join(uh.get('tags', [])) or 'unknown'
         reasons.append(f'URLhaus: known malicious URL (tags: {tags})')
-    # Dynamic weighting based on availability of external APIs
+        
     ml_weight = 0.4
     vt_weight = 0.4 if (vt.get('available') and vt_total > 0) else 0.0
     uh_weight = 0.2 if uh.get('available') else 0.0
@@ -107,6 +108,7 @@ def combine_final_score(ml_confidence: float, threat_intel: dict, forensics: dic
         elif dist == 2:
             forensics_penalty += 0.3
             reasons.append(f"Potential typosquat detected (similar to '{brand}')")
+            
     whois = forensics.get('whois', {})
     if whois.get('is_newly_registered'):
         age = whois.get('domain_age_days', 999)
@@ -116,20 +118,20 @@ def combine_final_score(ml_confidence: float, threat_intel: dict, forensics: dic
         else:
             forensics_penalty += 0.2
             reasons.append(f'Risk: domain is newly registered ({age} days old)')
+            
     dns = forensics.get('dns', {})
     domain_age = whois.get('domain_age_days')
     if dns.get('available') and (not dns.get('has_mx_record')) and (domain_age is not None and domain_age < 365):
         forensics_penalty += 0.1
         reasons.append('Missing mail records on a young domain is highly suspicious')
+        
     final_score_raw = raw_score + forensics_penalty
-    # Invert: 100 = safest, 0 = most dangerous
     score = 100 - int(round(final_score_raw * 100))
     
-    # Ensure high ML confidence is respected (not drowned out by clean/missing external APIs)
     if ml_confidence >= 0.8:
-        score = min(score, 29)  # Force Malicious (red)
+        score = min(score, 29)
     elif ml_confidence >= 0.5:
-        score = min(score, 59)  # Force Suspicious (orange)
+        score = min(score, 59)
 
     score = max(0, min(100, score))
     if score >= 60:
