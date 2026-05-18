@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishGuard — Real-Time Phishing Detection Dashboard</title>
+  <meta name="description" content="PhishGuard dashboard for scanning URLs in real-time using ML-powered phishing detection, threat intelligence, and domain forensics." />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <header>
+      <h1>PhishGuard</h1>
+      <p>Real-time phishing URL detection powered by XGBoost ML, threat intelligence feeds, and domain forensics.</p>
+    </header>
+
+    <!-- Scan Bar -->
+    <div class="scan-bar">
+      <input
+        id="url-input"
+        type="text"
+        placeholder="Enter a URL to scan — e.g. https://suspicious-site.com"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button id="scan-btn" class="btn-scan">
+        <span id="scan-label">🔍 Scan URL</span>
+        <span id="scan-spinner" class="spinner hidden"></span>
+      </button>
+    </div>
+
+    <!-- Error -->
+    <div id="error-msg" class="error-msg hidden"></div>
+
+    <!-- Result Wrap -->
+    <div id="result-wrap">
+      <!-- Result Card (rendered by JS) -->
+      <div id="result-card" class="result-card glass-strong hidden"></div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="glass empty-state">
+      <p>🛡️ Enter a URL above to start scanning</p>
+    </div>
+
+    <!-- Chart Section -->
+    <div id="chart-section" class="section hidden">
+      <h2>Risk Distribution</h2>
+      <div class="glass chart-container">
+        <canvas id="risk-chart" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- History Section -->
+    <div id="history-section" class="section hidden">
+      <h2>Scan History <span style="opacity:0.5;font-weight:400">(<span id="history-count">0</span>)</span></h2>
+      <div class="glass" style="overflow:auto; border-radius:12px;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>URL</th>
+              <th>Verdict</th>
+              <th>Score</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Export Section -->
+    <div id="export-section" class="section hidden">
+      <button id="export-btn" class="btn-export">📄 Export IoC Report</button>
+    </div>
+
+    <footer>
+      PhishGuard &mdash; Rocket_Crash &bull; ML-powered phishing detection
+    </footer>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
