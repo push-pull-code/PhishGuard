@@ -1,74 +1,241 @@
-# PhishGuard 🛡️
+# 🛡️ PhishGuard
 
-PhishGuard is a high-performance browser extension and machine learning pipeline designed for real-time phishing detection. It uses a hybrid approach of ML inference, dataset matching (OpenPhish, ISCX, URLhaus, Tranco), and domain forensics (WHOIS, DNS, Typosquatting) to classify URLs in under 500ms.
+PhishGuard is a real-time phishing URL detection system that combines machine learning, browser-based threat intelligence, and asynchronous domain analysis to identify malicious websites with low latency. The system consists of a Chrome Extension (Manifest V3) and a FastAPI backend that performs parallel security lookups before classifying URLs using an ensemble machine learning model.
 
-## Architecture
-- **Frontend:** Chrome Extension (`manifest V3`, Vanilla JS/HTML/Tailwind) with an IndexedDB client-side cache and auto-scan background worker.
-- **Backend:** Python FastAPI server with an LRU cache, dataset lookup service (O(1) hash-map matching), and parallelized external intel gathering.
-- **ML Pipeline:** XGBoost classifier utilizing 22 URL features (entropy, digit ratios, path depths, etc).
+---
 
-## Installation
+## 🚀 Features
 
-### 1. Setup the Backend
-Make sure you have Python 3.9+ installed.
+- ⚡ Real-time phishing detection in ~400ms average latency
+- 🤖 Soft Voting Ensemble (XGBoost + Random Forest + SVM)
+- 🌐 Parallel asynchronous DNS, WHOIS, VirusTotal, URLHaus, and PhishTank lookups
+- 📊 36 handcrafted URL-based features for ML inference
+- 🧠 Intelligent caching using IndexedDB (client) and LRU Cache (backend)
+- 🔄 Request deduplication to avoid redundant external API calls
+- 🧩 Chrome Extension built using Manifest V3 Service Workers
+- 📈 Threat score with ML confidence and domain intelligence
+
+---
+
+# 🏗️ Architecture
+
+```
+Chrome Extension
+        │
+        ▼
+Manifest V3 Service Worker
+        │
+        ▼
+ IndexedDB Cache
+        │
+        ▼
+ FastAPI Backend
+        │
+ ┌──────┴───────────────────────────┐
+ │                                  │
+ ▼                                  ▼
+Threat Intelligence APIs       Feature Extraction
+(DNS, WHOIS, VirusTotal,       (36 URL Features)
+ URLHaus, PhishTank)
+ │                                  │
+ └──────────────┬───────────────────┘
+                ▼
+     Soft Voting Ensemble
+(XGBoost + Random Forest + SVM)
+                │
+                ▼
+      Safe / Suspicious / Phishing
+```
+
+---
+
+# 🧠 Machine Learning Pipeline
+
+The phishing classifier uses a **Soft Voting Ensemble** consisting of:
+
+- XGBoost
+- Random Forest
+- Support Vector Machine (SVM)
+
+The ensemble combines probability outputs from all three models, improving robustness and generalization over relying on a single classifier.
+
+### Feature Engineering
+
+The model is trained on **36 handcrafted URL-based features**, including:
+
+- URL Length
+- Domain Length
+- Digit Ratio
+- Special Character Count
+- Path Depth
+- Entropy
+- Suspicious Keywords
+- Number of Subdomains
+- HTTPS Usage
+- IP Address Presence
+- URL Shortener Detection
+- Domain Age
+- and additional lexical & structural URL features.
+
+---
+
+# ⚡ Threat Intelligence
+
+For every scanned URL, the backend performs asynchronous lookups across multiple intelligence sources:
+
+- DNS Resolution
+- WHOIS Records
+- VirusTotal
+- URLHaus
+- PhishTank
+
+These requests execute concurrently using asynchronous FastAPI endpoints, significantly reducing average response latency.
+
+---
+
+# 💾 Caching
+
+## Client Side
+
+- IndexedDB
+- Instant lookup for previously scanned URLs
+- Rescan option to bypass cache
+
+## Backend
+
+- LRU Cache
+- Request Deduplication
+- Prevents repeated external API requests for identical URLs
+
+---
+
+# 🖥️ Tech Stack
+
+### Frontend
+
+- Chrome Extension
+- Manifest V3
+- JavaScript
+- HTML
+- TailwindCSS
+
+### Backend
+
+- Python
+- FastAPI
+- AsyncIO
+
+### Machine Learning
+
+- XGBoost
+- Random Forest
+- Support Vector Machine
+- Scikit-Learn
+- Pandas
+- NumPy
+
+---
+
+# 📂 Installation
+
+## Clone Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/PhishGuard.git
 cd PhishGuard
+```
 
-# Create and activate a virtual environment
+## Create Virtual Environment
+
+```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
 
-# Install the dependencies
+Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Linux/Mac
+
+```bash
+source .venv/bin/activate
+```
+
+## Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download Datasets and Train Model (Optional)
-If you want to train the model from scratch, place your CSV datasets (`iscx_url_2016.csv`, `urlhaus.csv`, `phishtank.csv`, `tranco_top1m.csv`) into the `ml/data/` folder and run:
-```bash
-python ml/train.py
-```
-*(A pre-trained `model.pkl` is already built into the pipeline).*
+---
 
-### 3. Run the API Server
-Start the FastAPI server:
+# ▶️ Run Backend
+
 ```bash
 python backend/main.py
 ```
-Checking ports in use:
-```bash
-lsof -i :8000
-```
-For stoping ports in use:
-```bash
-kill -9 $(lsof -t -i:8000)
-```
-Run on another port:
-```bash
-uvicorn main:app --reload --port 8001
-```
-The server will run at `http://localhost:8000`.
 
-### 4. Install the Chrome Extension
-1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer Mode** in the top right corner.
-3. Click **Load unpacked** and select the `extension/` folder in this repository.
-4. Pin the PhishGuard icon to your toolbar.
+or
 
-## Usage
-The extension automatically monitors pages you navigate to and changes color to indicate safety:
-- 🟢 **Green**: Safe / Genuine
-- 🟠 **Orange**: Suspicious / Caution
-- 🔴 **Red**: Phishing / Malware
-- ⚪ **Grey**: Inactive / Internal page
-
-Click the extension icon at any time to see a detailed breakdown of the threat score, ML confidence, and domain forensics.
-
-## Cache Management
-To clear the backend in-memory cache:
 ```bash
-curl -X DELETE http://localhost:8000/scan/cache
+uvicorn main:app --reload
 ```
-To clear the extension cache for a single URL, click the **Rescan** button in the popup.
+
+Backend
+
+```
+http://localhost:8000
+```
+
+---
+
+# 🧩 Install Chrome Extension
+
+1. Open Chrome
+
+```
+chrome://extensions
+```
+
+2. Enable Developer Mode
+
+3. Click **Load Unpacked**
+
+4. Select the `extension/` directory
+
+---
+
+# 📊 Prediction Output
+
+The extension displays
+
+- 🟢 Safe
+- 🟠 Suspicious
+- 🔴 Phishing
+
+along with
+
+- ML Confidence
+- Threat Score
+- Domain Intelligence Summary
+
+---
+
+# 📈 Performance
+
+- Average Detection Latency: **~400 ms**
+- Parallel asynchronous API requests
+- IndexedDB + LRU Cache for low-latency repeated scans
+- Soft Voting Ensemble improves classification robustness
+
+---
+
+# 🔮 Future Improvements
+
+- Deep Learning based URL classification
+- Browser history risk analysis
+- Email phishing detection
+- Real-time blacklist synchronization
+- Cloud deployment with Docker & Kubernetes
